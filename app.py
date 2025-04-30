@@ -1,65 +1,34 @@
 import streamlit as st
 import yfinance as yf
-import plotly.graph_objs as go
-from yfinance.exceptions import YFRateLimitError
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="📈 Stock Insights", layout="wide")
-
-st.title("📊 Stock Market Dashboard")
-
-# Input field
-ticker = st.text_input("Enter Stock Ticker (e.g., AAPL, RELIANCE.NS)", "AAPL")
-
-@st.cache_data(ttl=3600)  # Cache for 1 hour
-def fetch_data(ticker):
+# Function to get stock data
+def get_stock_data(ticker, start_date, end_date):
     stock = yf.Ticker(ticker)
-    hist = stock.history(period="1y")
-    info = stock.info
-    return hist, info
+    data = stock.history(period="1d", start=start_date, end=end_date)
+    return data
 
-if ticker:
-    try:
-        hist, info = fetch_data(ticker)
+# Streamlit app layout
+st.title('Stock Market Tracker')
+st.sidebar.header('Stock Search')
 
-        # Price Chart
-        st.subheader(f"{ticker} - Price Chart (1 Year)")
-        fig = go.Figure(data=[go.Candlestick(
-            x=hist.index,
-            open=hist['Open'],
-            high=hist['High'],
-            low=hist['Low'],
-            close=hist['Close'],
-            increasing_line_color='green',
-            decreasing_line_color='red'
-        )])
-        fig.update_layout(xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
+# Sidebar Inputs
+ticker = st.sidebar.text_input("Enter Stock Ticker", "AAPL")
+start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2022-01-01"))
+end_date = st.sidebar.date_input("End Date", pd.to_datetime("2023-01-01"))
 
-        # Financial Metrics
-        st.subheader("🔎 Key Financial Metrics")
-        metrics = {
-            "P/E Ratio": info.get("trailingPE", "N/A"),
-            "EPS": info.get("trailingEps", "N/A"),
-            "Market Cap": info.get("marketCap", "N/A"),
-            "Volume": info.get("volume", "N/A"),
-            "Book Value": info.get("bookValue", "N/A"),
-            "P/B Ratio": info.get("priceToBook", "N/A"),
-            "Beta": info.get("beta", "N/A"),
-            "52 Week High": info.get("fiftyTwoWeekHigh", "N/A"),
-            "52 Week Low": info.get("fiftyTwoWeekLow", "N/A"),
-        }
+# Fetch and display stock data
+stock_data = get_stock_data(ticker, start_date, end_date)
 
-        avg_52_week = (
-            (info.get("fiftyTwoWeekHigh", 0) + info.get("fiftyTwoWeekLow", 0)) / 2
-            if info.get("fiftyTwoWeekHigh") and info.get("fiftyTwoWeekLow")
-            else "N/A"
-        )
-        metrics["52 Week Avg Price"] = avg_52_week
+# Display the stock data in a table
+st.write("### Stock Data", stock_data)
 
-        for key, value in metrics.items():
-            st.markdown(f"**{key}:** {value}")
-
-    except YFRateLimitError:
-        st.warning("⚠️ Yahoo Finance rate limit exceeded. Please try again later.")
-    except Exception as e:
-        st.error(f"❌ An error occurred: {e}")
+# Plot stock data
+st.write("### Stock Price Chart")
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(stock_data.index, stock_data['Close'], label='Close Price')
+ax.set_xlabel('Date')
+ax.set_ylabel('Close Price (USD)')
+ax.set_title(f'{ticker} Stock Price from {start_date} to {end_date}')
+ax.legend()
+st.pyplot(fig)
